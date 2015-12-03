@@ -183,7 +183,7 @@ func Capitalize(in string) (out string) {
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Println("Usage:", os.Args[0], "struct.schema.json")
+		fmt.Println("Usage:", os.Args[0], "struct.schema.json [package]")
 		os.Exit(1)
 		return
 	}
@@ -196,6 +196,11 @@ func main() {
 	LoadRef(filepath.Base(os.Args[1]), &schema)
 
 	schema.GoType(true)
+
+	if len(os.Args) > 2 {
+		fmt.Println("package", os.Args[2])
+		fmt.Println()
+	}
 
 	for _, name := range SortedKeys(GlobalTypes) {
 		src := "type " + name + " " + GlobalTypes[name]
