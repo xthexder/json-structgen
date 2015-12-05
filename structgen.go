@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"go/format"
 	"io/ioutil"
@@ -102,9 +103,9 @@ func (js *JsonSchema) GoType(collapse bool) string {
 			src += "}"
 
 			if len(name) > 0 {
-				GlobalTypes[name] = src
+				GlobalTypes[structPrefix+name] = src
 				if collapse {
-					return name
+					return structPrefix + name
 				}
 			}
 			return src
@@ -187,24 +188,38 @@ func Capitalize(in string) (out string) {
 	return
 }
 
+var packageName, structPrefix string
+
+func init() {
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: %s [options] struct.schema.json\n", os.Args[0])
+		fmt.Fprintln(os.Stderr, "\nOptions:")
+		flag.PrintDefaults()
+	}
+
+	flag.StringVar(&packageName, "package", "", "Generated package name")
+	flag.StringVar(&structPrefix, "prefix", "Json", "Prefix for generated structs")
+	flag.Parse()
+}
+
 func main() {
-	if len(os.Args) < 2 {
-		fmt.Println("Usage:", os.Args[0], "struct.schema.json [package]")
+	if len(flag.Args()) != 1 {
+		flag.Usage()
 		os.Exit(1)
 		return
 	}
 
-	os.Chdir(filepath.Dir(os.Args[1]))
+	os.Chdir(filepath.Dir(flag.Arg(0)))
 
 	GlobalTypes = make(map[string]string)
 
 	var schema JsonSchema
-	LoadRef(filepath.Base(os.Args[1]), &schema)
+	LoadRef(filepath.Base(flag.Arg(0)), &schema)
 
 	schema.GoType(true)
 
-	if len(os.Args) > 2 {
-		fmt.Println("package", os.Args[2])
+	if len(packageName) > 0 {
+		fmt.Println("package", packageName)
 		fmt.Println()
 	}
 
