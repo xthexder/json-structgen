@@ -73,9 +73,9 @@ func (js *JsonSchema) GoType(collapse bool) string {
 		case "boolean":
 			return "bool"
 		case "integer":
-			return "int"
+			return "int64"
 		case "number":
-			return "float"
+			return "float64"
 		case "string":
 			return "string"
 		case "array":
