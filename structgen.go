@@ -23,7 +23,8 @@ type JsonSchema struct {
 	Description          string                 `json:"description"`
 	Extends              *JsonSchema            `json:"extends"`
 	Properties           map[string]*JsonSchema `json:"properties"`
-	AdditionalProperties interface{}            `json:"additionalProperties"`
+	AdditionalInterface  interface{}            `json:"additionalProperties"`
+	AdditionalProperties *JsonSchema            `json:"-"`
 	Items                *JsonSchema            `json:"items"`
 }
 
@@ -56,6 +57,7 @@ func SchemaFromInterface(in interface{}) *JsonSchema {
 				out.Properties[k] = SchemaFromInterface(v)
 			}
 		}
+		out.LoadRef()
 		return out
 	default:
 		panic(fmt.Sprintf("Unknown schema interface: %+v", in))
@@ -86,18 +88,24 @@ func (js *JsonSchema) GoType(collapse bool) string {
 		case "object":
 			name := Capitalize(js.Title)
 
-			if len(js.Properties) == 0 && js.AdditionalProperties != nil {
+			if len(js.Properties) == 0 {
+				if js.AdditionalProperties != nil {
+					return "map[string]" + js.AdditionalProperties.GoType(true)
+				}
 				return "interface{}"
 			}
+
 			src := "struct {\n"
 			for _, n := range SortedKeys(js.Properties) {
 				src += Capitalize(n) + " " + js.Properties[n].GoType(true) + " `json:\"" + n + "\"`\n"
 			}
 			src += "}"
 
-			GlobalTypes[name] = src
-			if collapse {
-				return name
+			if len(name) > 0 {
+				GlobalTypes[name] = src
+				if collapse {
+					return name
+				}
 			}
 			return src
 		default:
@@ -125,25 +133,23 @@ func (js *JsonSchema) LoadRef() {
 	if js.Properties == nil {
 		js.Properties = make(map[string]*JsonSchema)
 	}
+	js.AdditionalProperties = SchemaFromInterface(js.AdditionalInterface)
 
-	additionalProperties := SchemaFromInterface(js.AdditionalProperties)
-	for _, add := range []*JsonSchema{additionalProperties, js.Extends} {
-		if add != nil {
-			add.LoadRef()
+	if js.Extends != nil {
+		js.Extends.LoadRef()
 
-			if len(js.Title) == 0 {
-				js.Title = add.Title
-			}
-			if js.Type == nil {
-				js.Type = add.Type
-			}
-			if js.Items == nil {
-				js.Items = add.Items
-			}
-			for k, v := range add.Properties {
-				if _, ok := js.Properties[k]; !ok {
-					js.Properties[k] = v
-				}
+		if len(js.Title) == 0 {
+			js.Title = js.Extends.Title
+		}
+		if js.Type == nil {
+			js.Type = js.Extends.Type
+		}
+		if js.Items == nil {
+			js.Items = js.Extends.Items
+		}
+		for k, v := range js.Extends.Properties {
+			if _, ok := js.Properties[k]; !ok {
+				js.Properties[k] = v
 			}
 		}
 	}
